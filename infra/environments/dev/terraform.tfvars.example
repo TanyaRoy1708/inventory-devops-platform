@@ -1,0 +1,2 @@
+eks_cluster_admin_principal_arn = "PASTE_YOUR_IAM_USER_ARN_HERE"
+eks_public_access_cidrs        = ["YOUR_PUBLIC_IP/32"]
