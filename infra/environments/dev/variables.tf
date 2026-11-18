@@ -46,22 +46,7 @@ variable "kubernetes_version" {
   }
 }
 
-variable "db_deletion_protection" {
-  description = "Protect RDS against deletion until explicitly disabled and applied."
-  type        = bool
-  default     = true
-}
 
-variable "db_final_snapshot_identifier" {
-  description = "Final snapshot name; change if a snapshot already uses this name."
-  type        = string
-  default     = "inventory-dev-final"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9-]{0,254}$", var.db_final_snapshot_identifier)) && !strcontains(var.db_final_snapshot_identifier, "--") && !endswith(var.db_final_snapshot_identifier, "-")
-    error_message = "Snapshot identifier must start with a letter, contain only letters, digits, and single hyphens, and not end with a hyphen."
-  }
-}
 
 variable "ecr_force_delete" {
   description = "Allow deleting a nonempty ECR repository only for deliberate teardown."

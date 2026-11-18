@@ -1,0 +1,14 @@
+# Temporary lab exceptions. Review before public deployment.
+
+# EKS 1.36 provides default envelope encryption using an AWS-owned key.
+AVD-AWS-0039
+
+# Public management API is needed for workstation kubectl access.
+# Access remains restricted by trusted IP CIDRs and IAM authorization.
+AVD-AWS-0040
+
+# A trusted public IPv4 /32 is intentional for workstation access.
+AVD-AWS-0041
+
+# State uses encrypted SSE-S3 storage; a customer-managed KMS key is deferred.
+AVD-AWS-0132

@@ -3,7 +3,7 @@ terraform {
   # backend "local" {
   #   path = "terraform.tfstate"
   # }
-   backend "s3" {
+  backend "s3" {
     bucket       = "inventory-tfstate-e7b1afc0da7dd8de2cb4526e3b"
     key          = "bootstrap/terraform.tfstate"
     region       = "us-east-1"

@@ -1,0 +1,70 @@
+name: Terraform
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Format, validate, lint, and scan
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        directory:
+          - infra/bootstrap
+          - infra/environments/dev
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.3
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff infra
+
+      - name: Initialize without backend
+        working-directory: ${{ matrix.directory }}
+        run: terraform init -backend=false -input=false
+
+      - name: Validate configuration
+        working-directory: ${{ matrix.directory }}
+        run: terraform validate
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.65.0
+
+      - name: Run TFLint
+        working-directory: ${{ matrix.directory }}
+        run: |
+          tflint --init --config "$GITHUB_WORKSPACE/infra/.tflint.hcl"
+          tflint --config "$GITHUB_WORKSPACE/infra/.tflint.hcl"
+
+      - name: Scan infrastructure code with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: config
+          scan-ref: ${{ matrix.directory }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: infra/.trivyignore
+          skip-dirs: ".terraform,**/.terraform"
+          skip-files: "*.tfplan,**/*.tfplan,*.tfstate*,**/*.tfstate*"
