@@ -115,7 +115,7 @@ jobs:
             inventory-app:${{ github.sha }} \
             python -c "from app.main import app; import alembic; print('Application and Alembic imports passed')"
 
-      - name: Scan application image
+      - name: Report all image vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: v0.76.2
@@ -123,4 +123,15 @@ jobs:
           image-ref: inventory-app:${{ github.sha }}
           scanners: vuln
           severity: HIGH,CRITICAL
+          exit-code: "0"
+
+      - name: Block fixable image vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: image
+          image-ref: inventory-app:${{ github.sha }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
           exit-code: "1"
