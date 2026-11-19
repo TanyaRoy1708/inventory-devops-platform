@@ -93,3 +93,24 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           skip-dirs: ".git,.venv,infra"
+  build_image:
+    name: Build container image
+    needs: [tests, secrets, source_scan]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build application image
+        run: docker build -t inventory-app:${{ github.sha }} .
+
+      - name: Scan application image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.76.2
+          scan-type: image
+          image-ref: inventory-app:${{ github.sha }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: "1"
