@@ -105,9 +105,15 @@ jobs:
       - name: Build application image
         run: docker build -t inventory-app:${{ github.sha }} .
 
-      - name: Inspect pip bundled dependencies
+      - name: Verify application imports
         run: |
-          docker run --rm inventory-app:${{ github.sha }} python -c "from pathlib import Path; import pip; print((Path(pip.__file__).parent / '_vendor' / 'vendor.txt').read_text())"
+          docker run --rm \
+            -e DB_HOST=localhost \
+            -e DB_NAME=inventory_test \
+            -e DB_USER=inventory_app \
+            -e DB_PASSWORD=ci-only-password \
+            inventory-app:${{ github.sha }} \
+            python -c "from app.main import app; import alembic; print('Application and Alembic imports passed')"
 
       - name: Scan application image
         uses: aquasecurity/trivy-action@v0.36.0
