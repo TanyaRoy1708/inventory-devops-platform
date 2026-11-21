@@ -97,6 +97,9 @@ jobs:
     name: Build container image
     needs: [tests, secrets, source_scan]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -135,3 +138,14 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+
+      - name: Configure AWS credentials
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify AWS identity
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: aws sts get-caller-identity
