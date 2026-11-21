@@ -25,6 +25,7 @@ jobs:
         directory:
           - infra/bootstrap
           - infra/environments/dev
+          - infra/github-actions
 
     steps:
       - name: Check out repository

@@ -1,0 +1,7 @@
+aws_region           = "us-east-1"
+github_repository    = "YOUR_GITHUB_OWNER/YOUR_REPOSITORY"
+github_owner_id      = "YOUR_GITHUB_OWNER_ID"
+github_repository_id = "YOUR_GITHUB_REPOSITORY_ID"
+github_branch        = "main"
+ecr_repository_name  = "inventory-dev"
+role_name            = "inventory-github-ecr-push"
