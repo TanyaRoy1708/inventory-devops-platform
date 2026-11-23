@@ -1,0 +1,84 @@
+name: Deploy application
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Commit SHA of the image already published to ECR
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventory-dev-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to development
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, inventory-deploy]
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      KUBECONFIG: ${{ runner.temp }}/inventory-kubeconfig-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS deployment credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          unset-current-credentials: true
+
+      - name: Configure Kubernetes connection
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME" \
+            --kubeconfig "$KUBECONFIG"
+
+      - name: Verify deployment access
+        run: |
+          kubectl auth can-i patch deployments --namespace inventory
+          kubectl get secret inventory-db --namespace inventory --output=name
+
+      - name: Deploy application with Helm
+        run: |
+          AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          IMAGE_REPOSITORY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
+
+          helm upgrade --install inventory deploy/helm/inventory \
+            --namespace inventory \
+            --set-string "image.repository=$IMAGE_REPOSITORY" \
+            --set-string "image.tag=$IMAGE_TAG" \
+            --wait \
+            --timeout 10m
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/inventory \
+            --namespace inventory \
+            --timeout=180s
+
+          kubectl get pods --namespace inventory \
+            --selector app.kubernetes.io/instance=inventory
+      
+      - name: Remove temporary Kubernetes configuration
+        if: always()
+        run: rm -f -- "$KUBECONFIG"
