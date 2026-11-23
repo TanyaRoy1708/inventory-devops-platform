@@ -71,3 +71,13 @@ output "db_admin_secret_arn" {
   description = "ARN of the administrator credential secret."
   value       = module.rds.master_user_secret_arn
 }
+
+output "runner_instance_id" {
+  description = "Deployment runner instance ID for Systems Manager access"
+  value       = module.runner.instance_id
+}
+
+output "runner_private_ip" {
+  description = "Private IP address of the deployment runner"
+  value       = module.runner.private_ip
+}

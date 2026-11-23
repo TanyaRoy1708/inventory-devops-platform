@@ -43,3 +43,14 @@ module "rds" {
   subnet_ids                = module.network.database_subnet_ids
   allowed_security_group_id = module.eks.node_security_group_id
 }
+
+module "runner" {
+  source = "../../modules/runner"
+
+  name_prefix                   = var.name_prefix
+  vpc_id                        = module.network.vpc_id
+  subnet_id                     = module.network.application_subnet_ids[0]
+  eks_cluster_security_group_id = module.eks.node_security_group_id
+
+  depends_on = [module.network]
+}

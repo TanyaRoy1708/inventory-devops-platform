@@ -34,3 +34,13 @@ variable "role_name" {
   description = "Name of the GitHub Actions IAM role"
   type        = string
 }
+
+variable "deployment_role_name" {
+  description = "Name of the IAM role used by GitHub Actions to deploy to EKS"
+  type        = string
+}
+
+variable "eks_cluster_name" {
+  description = "EKS cluster the deployment role can describe"
+  type        = string
+}

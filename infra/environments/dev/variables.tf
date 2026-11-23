@@ -46,6 +46,11 @@ variable "kubernetes_version" {
   }
 }
 
+variable "eks_deployment_role_arn" {
+  description = "IAM role used by GitHub Actions to deploy to the inventory namespace"
+  type        = string
+}
+
 
 
 variable "ecr_force_delete" {
