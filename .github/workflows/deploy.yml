@@ -31,9 +31,11 @@ jobs:
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
       IMAGE_TAG: ${{ inputs.image_tag }}
-      KUBECONFIG: ${{ runner.temp }}/inventory-kubeconfig-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
+      - name: Prepare Kubernetes configuration path
+        run: echo "KUBECONFIG=$RUNNER_TEMP/inventory-kubeconfig-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+
       - name: Check out repository
         uses: actions/checkout@v6
         with:
