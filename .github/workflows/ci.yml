@@ -95,7 +95,7 @@ jobs:
           skip-dirs: ".git,.venv,infra"
   build_image:
     name: Build container image
-    needs: [tests, secrets, source_scan]
+    needs: [tests, secrets, source_scan, helm_checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -165,3 +165,21 @@ jobs:
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker tag "inventory-app:$IMAGE_TAG" "$IMAGE_URI"
           docker push "$IMAGE_URI"
+  helm_checks:
+    name: Validate Helm chart
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v4.3.2
+
+      - name: Lint chart
+        run: helm lint deploy/helm/inventory --set image.repository=inventory-app --set image.tag=check
+
+      - name: Render chart
+        run: helm template inventory deploy/helm/inventory --set image.repository=inventory-app --set image.tag=check > /dev/null
