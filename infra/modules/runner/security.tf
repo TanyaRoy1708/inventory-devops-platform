@@ -30,3 +30,15 @@ resource "aws_vpc_security_group_ingress_rule" "eks_api" {
   to_port                      = 443
   referenced_security_group_id = aws_security_group.runner.id
 }
+
+# Lab exception: Ubuntu's default package repositories require outbound HTTP.
+#trivy:ignore:AVD-AWS-0104
+resource "aws_vpc_security_group_egress_rule" "http" {
+  security_group_id = aws_security_group.runner.id
+  description       = "HTTP access to Ubuntu package repositories"
+
+  ip_protocol = "tcp"
+  from_port   = 80
+  to_port     = 80
+  cidr_ipv4   = "0.0.0.0/0"
+}

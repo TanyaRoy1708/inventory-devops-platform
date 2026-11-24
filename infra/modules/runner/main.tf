@@ -28,5 +28,6 @@ resource "aws_instance" "runner" {
   depends_on = [
     aws_iam_role_policy_attachment.ssm,
     aws_vpc_security_group_egress_rule.https,
+    aws_vpc_security_group_egress_rule.http,
   ]
 }

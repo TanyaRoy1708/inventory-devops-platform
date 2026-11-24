@@ -8,6 +8,16 @@ data "aws_iam_policy_document" "eks_deploy" {
       "arn:aws:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.eks_cluster_name}"
     ]
   }
+
+  statement {
+    sid     = "ReadPublishedImage"
+    effect  = "Allow"
+    actions = ["ecr:BatchGetImage"]
+
+    resources = [
+      "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/${var.ecr_repository_name}"
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "eks_deploy" {
