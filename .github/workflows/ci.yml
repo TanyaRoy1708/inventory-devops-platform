@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: application-ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   tests:
     name: Test application
@@ -97,6 +101,9 @@ jobs:
     name: Build container image
     needs: [tests, secrets, source_scan, helm_checks]
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.publish.outputs.image_tag }}
+      image_digest: ${{ steps.publish.outputs.image_digest }}
     permissions:
       contents: read
       id-token: write
@@ -156,6 +163,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Tag and push image to ECR
+        id: publish
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -165,6 +173,19 @@ jobs:
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker tag "inventory-app:$IMAGE_TAG" "$IMAGE_URI"
           docker push "$IMAGE_URI"
+          IMAGE_DIGEST="$(aws ecr batch-get-image \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$IMAGE_TAG" \
+            --query 'images[0].imageId.imageDigest' \
+            --output text)"
+
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::ECR did not return a valid published image digest."
+            exit 1
+          fi
+
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
   helm_checks:
     name: Validate Helm chart
     runs-on: ubuntu-latest
@@ -183,3 +204,30 @@ jobs:
 
       - name: Render chart
         run: helm template inventory deploy/helm/inventory --set image.repository=inventory-app --set image.tag=check > /dev/null
+      
+      - name: Validate digest-pinned chart
+        env:
+          CHECK_DIGEST: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: |
+          helm lint deploy/helm/inventory \
+            --set image.repository=inventory-app \
+            --set-string "image.digest=$CHECK_DIGEST"
+
+          helm template inventory deploy/helm/inventory \
+            --set image.repository=inventory-app \
+            --set-string "image.digest=$CHECK_DIGEST" > /dev/null
+  
+  deploy:
+    name: Deploy published image
+    needs: build_image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write
+
+    uses: ./.github/workflows/deploy.yml
+
+    with:
+      image_tag: ${{ needs.build_image.outputs.image_tag }}
+      image_digest: ${{ needs.build_image.outputs.image_digest }}

@@ -24,7 +24,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: inventory
-          image: {{ printf "%s:%s" (required "Set image.repository" .Values.image.repository) (required "Set image.tag" .Values.image.tag) | quote }}
+          image: {{ include "inventory.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http

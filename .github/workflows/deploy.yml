@@ -1,6 +1,17 @@
 name: Deploy application
 
 on:
+  workflow_call:
+    inputs:
+      image_tag:
+        description: Commit SHA published by CI
+        required: true
+        type: string
+      image_digest:
+        description: Exact image digest published by CI
+        required: true
+        type: string
+
   workflow_dispatch:
     inputs:
       image_tag:
@@ -31,11 +42,24 @@ jobs:
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
       IMAGE_TAG: ${{ inputs.image_tag }}
+      EXPECTED_IMAGE_DIGEST: ${{ inputs.image_digest || '' }}
 
     steps:
       - name: Prepare Kubernetes configuration path
         run: echo "KUBECONFIG=$RUNNER_TEMP/inventory-kubeconfig-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
 
+      - name: Validate image identity inputs
+        run: |
+          if [[ ! "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::image_tag must be a full commit SHA."
+            exit 1
+          fi
+
+          if [[ -n "$EXPECTED_IMAGE_DIGEST" && ! "$EXPECTED_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::image_digest must be a SHA-256 image digest."
+            exit 1
+          fi
+      
       - name: Check out repository
         uses: actions/checkout@v6
         with:
@@ -48,6 +72,25 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           unset-current-credentials: true
 
+      - name: Resolve and verify published image
+        run: |
+          IMAGE_DIGEST="$(aws ecr batch-get-image \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$IMAGE_TAG" \
+            --query 'images[0].imageId.imageDigest' \
+            --output text)"
+
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The selected image is not available in ECR."
+            exit 1
+          fi
+
+          if [[ -n "$EXPECTED_IMAGE_DIGEST" && "$IMAGE_DIGEST" != "$EXPECTED_IMAGE_DIGEST" ]]; then
+            echo "::error::The ECR digest does not match the image published by CI."
+            exit 1
+          fi
+
+          echo "DEPLOY_IMAGE_DIGEST=$IMAGE_DIGEST" >> "$GITHUB_ENV"
       - name: Configure Kubernetes connection
         run: |
           aws eks update-kubeconfig \
@@ -69,6 +112,7 @@ jobs:
             --namespace inventory \
             --set-string "image.repository=$IMAGE_REPOSITORY" \
             --set-string "image.tag=$IMAGE_TAG" \
+            --set-string "image.digest=$DEPLOY_IMAGE_DIGEST" \
             --wait \
             --timeout 10m
 
@@ -78,9 +122,18 @@ jobs:
             --namespace inventory \
             --timeout=180s
 
+          RUNNING_IMAGE="$(kubectl get deployment inventory \
+            --namespace inventory \
+            --output jsonpath='{.spec.template.spec.containers[0].image}')"
+
+          if [[ "$RUNNING_IMAGE" != *"@$DEPLOY_IMAGE_DIGEST" ]]; then
+            echo "::error::Deployment does not reference the expected image digest."
+            exit 1
+          fi
+
           kubectl get pods --namespace inventory \
             --selector app.kubernetes.io/instance=inventory
-      
+
       - name: Remove temporary Kubernetes configuration
         if: always()
         run: rm -f -- "$KUBECONFIG"
